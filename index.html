@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Talabat Food Delivery</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="loading-screen">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <h2>Loading...</h2>
+        </div>
+    </div>
+
+    <!-- Firebase Config Notice -->
+    <div id="firebase-notice" class="firebase-notice">
+        <div class="notice-content">
+            <h3>🔥 Firebase Setup Required</h3>
+            <p>Replace the firebaseConfig object in script.js with your actual Firebase configuration.</p>
+            <p class="notice-small">Get your config from Firebase Console → Project Settings → General → Your apps</p>
+            <button onclick="hideFirebaseNotice()" class="btn btn-primary">Got it</button>
+        </div>
+    </div>
+
+    <!-- Authentication Page -->
+    <div id="auth-page" class="page active">
+        <div class="auth-container">
+            <!-- Header -->
+            <div class="auth-header">
+                <div class="app-icon">
+                    <i data-lucide="utensils"></i>
+                </div>
+                <h1>Talabat Clone</h1>
+                <p>Food delivery made simple</p>
+            </div>
+
+            <!-- Auth Form -->
+            <div class="auth-card">
+                <!-- Tabs -->
+                <div class="auth-tabs">
+                    <button class="tab-btn active" onclick="switchTab('login')">Login</button>
+                    <button class="tab-btn" onclick="switchTab('register')">Register</button>
+                </div>
+
+                <!-- Login Form -->
+                <div id="login-form" class="auth-form active">
+                    <h2>Welcome Back</h2>
+                    <p class="form-description">Sign in to your account</p>
+                    
+                    <form onsubmit="handleLogin(event)">
+                        <div class="form-group">
+                            <label for="login-email">Email</label>
+                            <input type="email" id="login-email" placeholder="Enter your email" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="login-password">Password</label>
+                            <input type="password" id="login-password" placeholder="Enter your password" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-full" id="login-btn">
+                            Sign In
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Register Form -->
+                <div id="register-form" class="auth-form">
+                    <h2>Create Account</h2>
+                    <p class="form-description">Join our food delivery platform</p>
+                    
+                    <form onsubmit="handleRegister(event)">
+                        <div class="form-group">
+                            <label for="register-email">Email</label>
+                            <input type="email" id="register-email" placeholder="Enter your email" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="register-password">Password</label>
+                            <input type="password" id="register-password" placeholder="Enter your password" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="confirm-password">Confirm Password</label>
+                            <input type="password" id="confirm-password" placeholder="Confirm your password" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="user-role">Select Role</label>
+                            <select id="user-role" required>
+                                <option value="">Choose your role</option>
+                                <option value="admin">👑 Admin</option>
+                                <option value="restaurant">🍽️ Restaurant Owner</option>
+                                <option value="customer">👥 Customer</option>
+                                <option value="driver">🚗 Delivery Driver</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-full" id="register-btn">
+                            Create Account
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Dashboard -->
+    <div id="admin-dashboard" class="page dashboard">
+        <div class="dashboard-header">
+            <div class="header-content">
+                <div class="header-left">
+                    <div class="role-icon admin">
+                        <i data-lucide="shield"></i>
+                    </div>
+                    <div class="header-text">
+                        <h1>Admin Dashboard</h1>
+                        <p>Manage your food delivery platform</p>
+                    </div>
+                </div>
+                <button class="btn btn-outline" onclick="logout()">
+                    <i data-lucide="log-out"></i>
+                    Logout
+                </button>
+            </div>
+        </div>
+
+        <div class="dashboard-content">
+            <!-- Stats Cards -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span>Total Restaurants</span>
+                        <i data-lucide="utensils"></i>
+                    </div>
+                    <div class="stat-value" id="total-restaurants">3</div>
+                    <div class="stat-description">2 approved</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span>Total Orders</span>
+                        <i data-lucide="users"></i>
+                    </div>
+                    <div class="stat-value" id="total-orders">15</div>
+                    <div class="stat-description">12 completed</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span>Active Drivers</span>
+                        <i data-lucide="car"></i>
+                    </div>
+                    <div class="stat-value" id="active-drivers">2</div>
+                    <div class="stat-description">3 total drivers</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span>Revenue</span>
+                        <i data-lucide="dollar-sign"></i>
+                    </div>
+                    <div class="stat-value" id="total-revenue">$245.50</div>
+                    <div class="stat-description">Total platform revenue</div>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="dashboard-tabs">
+                <button class="tab-btn active" onclick="switchDashboardTab('restaurants')">Restaurants</button>
+                <button class="tab-btn" onclick="switchDashboardTab('orders')">Orders</button>
+                <button class="tab-btn" onclick="switchDashboardTab('drivers')">Drivers</button>
+            </div>
+
+            <!-- Restaurant Management -->
+            <div id="restaurants-tab" class="tab-content active">
+                <div class="content-card">
+                    <h3>Restaurant Management</h3>
+                    <p class="card-description">Approve or reject restaurant applications</p>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Restaurant Name</th>
+                                    <th>Email</th>
+                                    <th>Status</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="restaurants-table">
+                                <!-- Populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Orders Management -->
+            <div id="orders-tab" class="tab-content">
+                <div class="content-card">
+                    <h3>Order Management</h3>
+                    <p class="card-description">View all orders across the platform</p>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Order ID</th>
+                                    <th>Restaurant</th>
+                                    <th>Customer</th>
+                                    <th>Driver</th>
+                                    <th>Status</th>
+                                    <th>Total</th>
+                                    <th>Created</th>
+                                </tr>
+                            </thead>
+                            <tbody id="orders-table">
+                                <!-- Populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Drivers Management -->
+            <div id="drivers-tab" class="tab-content">
+                <div class="content-card">
+                    <h3>Driver Management</h3>
+                    <p class="card-description">Monitor driver activity and performance</p>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Driver Name</th>
+                                    <th>Email</th>
+                                    <th>Status</th>
+                                    <th>Orders Completed</th>
+                                    <th>Rating</th>
+                                </tr>
+                            </thead>
+                            <tbody id="drivers-table">
+                                <!-- Populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Restaurant Dashboard -->
+    <div id="restaurant-dashboard" class="page dashboard">
+        <div class="dashboard-header">
+            <div class="header-content">
+                <div class="header-left">
+                    <div class="role-icon restaurant">
+                        <i data-lucide="utensils"></i>
+                    </div>
+                    <div class="header-text">
+                        <h1>Restaurant Dashboard</h1>
+                        <p>Manage your menu and orders</p>
+                    </div>
+                </div>
+                <button class="btn btn-outline" onclick="logout()">
+                    <i data-lucide="log-out"></i>
+                    Logout
+                </button>
+            </div>
+        </div>
+
+        <div class="dashboard-content">
+            <!-- Stats Cards -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span>Menu Items</span>
+                        <i data-lucide="utensils"></i>
+                    </div>
+                    <div class="stat-value" id="menu-items-count">8</div>
+                    <div class="stat-description">6 available</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span>Pending Orders</span>
+                        <i data-lucide="clock"></i>
+                    </div>
+                    <div class="stat-value" id="pending-orders">3</div>
+                    <div class="stat-description">Awaiting response</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span>Active Orders</span>
+                        <i data-lucide="check-circle"></i>
+                    </div>
+                    <div class="stat-value" id="active-orders">2</div>
+                    <div class="stat-description">In progress</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span>Today's Revenue</span>
+                        <i data-lucide="dollar-sign"></i>
+                    </div>
+                    <div class="stat-value" id="restaurant-revenue">$156.50</div>
+                    <div class="stat-description">From 8 orders</div>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="dashboard-tabs">
+                <button class="tab-btn active" onclick="switchDashboardTab('restaurant-orders')">Orders</button>
+                <button class="tab-btn" onclick="switchDashboardTab('menu-management')">Menu Management</button>
+            </div>
+
+            <!-- Orders Tab -->
+            <div id="restaurant-orders-tab" class="tab-content active">
+                <div class="content-card">
+                    <h3>Incoming Orders</h3>
+                    <p class="card-description">Manage your restaurant orders in real-time</p>
+                    <div id="restaurant-orders-list">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Menu Management Tab -->
+            <div id="menu-management-tab" class="tab-content">
+                <div class="content-card">
+                    <div class="card-header-with-action">
+                        <div>
+                            <h3>Menu Management</h3>
+                            <p class="card-description">Add, edit, and manage your menu items</p>
+                        </div>
+                        <button class="btn btn-primary" onclick="showAddItemModal()">
+                            <i data-lucide="plus"></i>
+                            Add Item
+                        </button>
+                    </div>
+                    <div id="menu-items-list">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Customer Dashboard -->
+    <div id="customer-dashboard" class="page dashboard">
+        <div class="dashboard-header">
+            <div class="header-content">
+                <div class="header-left">
+                    <div class="role-icon customer">
+                        <i data-lucide="users"></i>
+                    </div>
+                    <div class="header-text">
+                        <h1>Food Delivery</h1>
+                        <p>Order from your favorite restaurants</p>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <button class="btn btn-outline cart-btn" onclick="toggleCart()" id="cart-button" style="display: none;">
+                        <i data-lucide="shopping-cart"></i>
+                        Cart (<span id="cart-count">0</span>)
+                    </button>
+                    <button class="btn btn-outline" onclick="logout()">
+                        <i data-lucide="log-out"></i>
+                        Logout
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="dashboard-content">
+            <!-- Tabs -->
+            <div class="dashboard-tabs">
+                <button class="tab-btn active" onclick="switchDashboardTab('restaurants-list')">Restaurants</button>
+                <button class="tab-btn" onclick="switchDashboardTab('customer-orders')">My Orders</button>
+            </div>
+
+            <!-- Restaurants List -->
+            <div id="restaurants-list-tab" class="tab-content active">
+                <div id="restaurants-view">
+                    <!-- Search -->
+                    <div class="search-container">
+                        <input type="text" id="restaurant-search" placeholder="Search restaurants or cuisine..." onkeyup="filterRestaurants()">
+                    </div>
+
+                    <!-- Restaurant Grid -->
+                    <div class="restaurants-grid" id="restaurants-grid">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Restaurant Menu View -->
+                <div id="restaurant-menu-view" style="display: none;">
+                    <div class="menu-header">
+                        <button class="btn btn-outline" onclick="backToRestaurants()">← Back to Restaurants</button>
+                        <div class="restaurant-info">
+                            <h2 id="selected-restaurant-name"></h2>
+                            <p id="selected-restaurant-details"></p>
+                        </div>
+                    </div>
+
+                    <div class="menu-layout">
+                        <div class="menu-items-section">
+                            <h3>Menu</h3>
+                            <div id="menu-items-grid">
+                                <!-- Populated by JavaScript -->
+                            </div>
+                        </div>
+
+                        <div class="cart-sidebar">
+                            <div class="cart-summary">
+                                <h3>Your Order</h3>
+                                <p class="cart-restaurant-name" id="cart-restaurant-name"></p>
+                                <div id="cart-items">
+                                    <p class="empty-cart">Your cart is empty</p>
+                                </div>
+                                <div id="cart-total" style="display: none;">
+                                    <div class="cart-totals">
+                                        <div class="total-line">
+                                            <span>Subtotal</span>
+                                            <span id="subtotal">$0.00</span>
+                                        </div>
+                                        <div class="total-line">
+                                            <span>Delivery Fee</span>
+                                            <span id="delivery-fee">$0.00</span>
+                                        </div>
+                                        <div class="total-line total-final">
+                                            <span>Total</span>
+                                            <span id="final-total">$0.00</span>
+                                        </div>
+                                    </div>
+                                    <button class="btn btn-primary btn-full" onclick="placeOrder()">
+                                        Place Order
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Customer Orders -->
+            <div id="customer-orders-tab" class="tab-content">
+                <div class="content-card">
+                    <h3>Order History</h3>
+                    <p class="card-description">Track your current and past orders</p>
+                    <div id="customer-orders-list">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Driver Dashboard -->
+    <div id="driver-dashboard" class="page dashboard">
+        <div class="dashboard-header">
+            <div class="header-content">
+                <div class="header-left">
+                    <div class="role-icon driver">
+                        <i data-lucide="car"></i>
+                    </div>
+                    <div class="header-text">
+                        <h1>Driver Dashboard</h1>
+                        <p>Manage your deliveries and earnings</p>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <div class="online-toggle">
+                        <label class="switch">
+                            <input type="checkbox" id="driver-online-status" onchange="toggleDriverStatus()">
+                            <span class="slider"></span>
+                        </label>
+                        <span id="driver-status-text">Offline</span>
+                    </div>
+                    <button class="btn btn-outline" onclick="logout()">
+                        <i data-lucide="log-out"></i>
+                        Logout
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="dashboard-content">
+            <!-- Stats Cards -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span>Today's Earnings</span>
+                        <i data-lucide="dollar-sign"></i>
+                    </div>
+                    <div class="stat-value" id="driver-earnings">$45.75</div>
+                    <div class="stat-description">From 8 deliveries</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span>Available Orders</span>
+                        <i data-lucide="bell"></i>
+                    </div>
+                    <div class="stat-value" id="available-orders-count">0</div>
+                    <div class="stat-description" id="available-orders-desc">Go online to see orders</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span>Active Deliveries</span>
+                        <i data-lucide="car"></i>
+                    </div>
+                    <div class="stat-value" id="active-deliveries">1</div>
+                    <div class="stat-description">In progress</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span>Status</span>
+                        <i data-lucide="car"></i>
+                    </div>
+                    <div class="stat-value" id="driver-status-display">Offline</div>
+                    <div class="stat-description" id="driver-status-desc">Not receiving orders</div>
+                </div>
+            </div>
+
+            <!-- Offline Notice -->
+            <div id="offline-notice" class="offline-notice">
+                <div class="notice-content">
+                    <i data-lucide="bell"></i>
+                    <div>
+                        <p class="notice-title">You're currently offline</p>
+                        <p class="notice-text">Turn on your online status to start receiving delivery requests</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="driver-orders-layout">
+                <!-- Available Orders -->
+                <div class="orders-section">
+                    <div class="content-card">
+                        <h3>Available Orders</h3>
+                        <p class="card-description" id="available-orders-description">Go online to see available orders</p>
+                        <div id="available-orders-list">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- My Orders -->
+                <div class="orders-section">
+                    <div class="content-card">
+                        <h3>My Active Deliveries</h3>
+                        <p class="card-description">Orders you've accepted and are currently delivering</p>
+                        <div id="my-orders-list">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Menu Item Modal -->
+    <div id="add-item-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add New Menu Item</h3>
+                <button class="modal-close" onclick="hideAddItemModal()">&times;</button>
+            </div>
+            <form onsubmit="addMenuItem(event)">
+                <div class="form-group">
+                    <label for="item-name">Item Name</label>
+                    <input type="text" id="item-name" required>
+                </div>
+                <div class="form-group">
+                    <label for="item-description">Description</label>
+                    <textarea id="item-description" required></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="item-price">Price ($)</label>
+                        <input type="number" id="item-price" step="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="item-category">Category</label>
+                        <input type="text" id="item-category" required>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-outline" onclick="hideAddItemModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Item</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>
