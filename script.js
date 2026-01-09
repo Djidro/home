@@ -1,223 +1,117 @@
-// Talabat Food Delivery App JavaScript
+// Talabat Food Delivery App JavaScript - FINAL VERSION
 
-// Firebase Configuration - REPLACE WITH YOUR ACTUAL CONFIG
+// 1. FIREBASE CONFIGURATION
+// This connects your specific project (Samail) to the app.
 const firebaseConfig = {
-    // Paste your Firebase configuration here
-    apiKey: "your-api-key",
-    authDomain: "your-project.firebaseapp.com",
-    projectId: "your-project-id",
-    storageBucket: "your-project.appspot.com",
-    messagingSenderId: "123456789",
-    appId: "your-app-id"
+  apiKey: "AIzaSyC_1B_UMLD670HB86qOqTm9e9G50IoTuCI",
+  authDomain: "samail-e3e1d.firebaseapp.com",
+  projectId: "samail-e3e1d",
+  storageBucket: "samail-e3e1d.firebasestorage.app",
+  messagingSenderId: "526248644310",
+  appId: "1:526248644310:web:e8e8b9d984bda4dc098377",
+  measurementId: "G-3ESFX89BLS"
 };
 
-// Initialize Firebase (uncomment when you have real config)
-// firebase.initializeApp(firebaseConfig);
-// const auth = firebase.auth();
-// const db = firebase.firestore();
+// 2. INITIALIZE FIREBASE
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
 
-// Mock Firebase for demonstration
-const mockAuth = {
-    currentUser: null,
-    signInWithEmailAndPassword: async (email, password) => {
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                resolve({ user: { uid: 'mock-uid-' + Date.now(), email } });
-            }, 1000);
-        });
-    },
-    createUserWithEmailAndPassword: async (email, password) => {
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                resolve({ user: { uid: 'mock-uid-' + Date.now(), email } });
-            }, 1000);
-        });
-    },
-    signOut: async () => {
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                mockAuth.currentUser = null;
-                resolve();
-            }, 500);
-        });
-    }
-};
-
-const mockFirestore = {
-    collection: (name) => ({
-        doc: (id) => ({
-            set: async (data) => {
-                console.log(`Setting document in ${name}/${id}:`, data);
-                return Promise.resolve();
-            },
-            get: async () => ({
-                exists: () => true,
-                data: () => ({ role: localStorage.getItem('userRole') || 'customer' })
-            })
-        }),
-        add: async (data) => {
-            console.log(`Adding document to ${name}:`, data);
-            return Promise.resolve({ id: 'mock-doc-' + Date.now() });
-        },
-        onSnapshot: (callback) => {
-            // Mock real-time listener
-            setTimeout(() => {
-                callback({
-                    docs: mockData[name] || []
-                });
-            }, 100);
-            return () => {}; // Unsubscribe function
-        }
-    })
-};
-
-// Global State
+// 3. GLOBAL VARIABLES
 let currentUser = null;
 let currentUserRole = null;
-let cart = {};
 let selectedRestaurant = null;
+let cart = {}; // Stores items like { 'itemId': {name: 'Pizza', price: 10, qty: 1} }
 let isDriverOnline = false;
 
-// Mock Data
-const mockData = {
-    restaurants: [
-        { id: '1', name: 'Pizza Palace', email: 'pizza@example.com', status: 'pending', createdAt: '2024-01-08', cuisine: 'Italian', rating: 4.5, deliveryTime: '30-45 min', deliveryFee: 2.99 },
-        { id: '2', name: 'Burger House', email: 'burger@example.com', status: 'approved', createdAt: '2024-01-07', cuisine: 'American', rating: 4.2, deliveryTime: '25-40 min', deliveryFee: 1.99 },
-        { id: '3', name: 'Sushi Master', email: 'sushi@example.com', status: 'approved', createdAt: '2024-01-06', cuisine: 'Japanese', rating: 4.8, deliveryTime: '40-55 min', deliveryFee: 3.99 },
-    ],
-    orders: [
-        { id: '1', restaurant: 'Pizza Palace', customer: 'john@example.com', driver: 'driver1@example.com', status: 'delivered', total: 25.99, createdAt: '2024-01-08 14:30', items: ['Margherita Pizza', 'Caesar Salad'] },
-        { id: '2', restaurant: 'Burger House', customer: 'jane@example.com', driver: null, status: 'preparing', total: 18.50, createdAt: '2024-01-08 15:15', items: ['Classic Burger', 'French Fries'] },
-        { id: '3', restaurant: 'Sushi Master', customer: 'bob@example.com', driver: 'driver2@example.com', status: 'on_way', total: 42.00, createdAt: '2024-01-08 15:45', items: ['Salmon Roll', 'Miso Soup'] },
-    ],
-    drivers: [
-        { id: '1', name: 'Mike Johnson', email: 'mike@example.com', status: 'online', orders: 5, rating: 4.8 },
-        { id: '2', name: 'Sarah Wilson', email: 'sarah@example.com', status: 'offline', orders: 12, rating: 4.9 },
-        { id: '3', name: 'David Brown', email: 'david@example.com', status: 'busy', orders: 8, rating: 4.7 },
-    ],
-    menuItems: {
-        '1': [
-            { id: '1', name: 'Margherita Pizza', description: 'Fresh tomatoes, mozzarella, basil', price: 12.99, category: 'Pizza', available: true },
-            { id: '2', name: 'Pepperoni Pizza', description: 'Pepperoni, mozzarella, tomato sauce', price: 15.99, category: 'Pizza', available: true },
-            { id: '3', name: 'Caesar Salad', description: 'Romaine lettuce, parmesan, croutons', price: 8.99, category: 'Salads', available: true },
-        ],
-        '2': [
-            { id: '4', name: 'Classic Burger', description: 'Beef patty, lettuce, tomato, onion', price: 11.99, category: 'Burgers', available: true },
-            { id: '5', name: 'Chicken Burger', description: 'Grilled chicken, lettuce, mayo', price: 10.99, category: 'Burgers', available: true },
-            { id: '6', name: 'French Fries', description: 'Crispy golden fries', price: 4.99, category: 'Sides', available: true },
-        ],
-        '3': [
-            { id: '7', name: 'Salmon Roll', description: 'Fresh salmon, avocado, cucumber', price: 8.99, category: 'Rolls', available: true },
-            { id: '8', name: 'Tuna Sashimi', description: 'Fresh tuna slices', price: 12.99, category: 'Sashimi', available: true },
-            { id: '9', name: 'Miso Soup', description: 'Traditional soybean soup', price: 3.99, category: 'Soups', available: true },
-        ],
-    },
-    availableOrders: [
-        { 
-            id: '10', 
-            restaurant: 'Pizza Palace', 
-            customer: 'John Doe',
-            customerAddress: '123 Main St, Downtown',
-            restaurantAddress: '456 Oak Ave, City Center',
-            items: ['Margherita Pizza', 'Caesar Salad'], 
-            total: 21.98, 
-            distance: '2.5 km',
-            estimatedTime: '15 min',
-            createdAt: '2024-01-08 14:30' 
-        },
-        { 
-            id: '11', 
-            restaurant: 'Burger House', 
-            customer: 'Jane Smith',
-            customerAddress: '789 Pine St, Suburbs',
-            restaurantAddress: '321 Elm St, Mall Area',
-            items: ['Classic Burger', 'French Fries'], 
-            total: 16.98, 
-            distance: '1.8 km',
-            estimatedTime: '12 min',
-            createdAt: '2024-01-08 15:15' 
-        },
-    ],
-    myOrders: [
-        { 
-            id: '12', 
-            restaurant: 'Thai Garden', 
-            customer: 'Alice Brown',
-            customerAddress: '999 Birch Ln, Riverside',
-            restaurantAddress: '111 Willow St, Town Square',
-            items: ['Pad Thai', 'Spring Rolls'], 
-            total: 18.50, 
-            status: 'picked_up',
-            distance: '2.1 km',
-            estimatedTime: '10 min',
-            createdAt: '2024-01-08 16:00' 
-        },
-    ]
-};
+// --- AUTHENTICATION & STARTUP ---
 
-// Utility Functions
-function showToast(title, message, type = 'success') {
-    const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-    toast.innerHTML = `
-        <div class="toast-title">${title}</div>
-        <div class="toast-message">${message}</div>
-    `;
+// This runs automatically whenever the user logs in, logs out, or refreshes the page
+auth.onAuthStateChanged(async (user) => {
+    if (user) {
+        currentUser = user;
+        // Check the database to find out if this user is a Driver, Admin, or Customer
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        if (userDoc.exists) {
+            currentUserRole = userDoc.data().role;
+            localStorage.setItem('userRole', currentUserRole);
+            localStorage.setItem('userEmail', user.email);
+            
+            // If we are still on the login screen, move to dashboard
+            if (document.getElementById('auth-page').classList.contains('active')) {
+                showDashboard(currentUserRole);
+            }
+        }
+    } else {
+        // User is logged out
+        showPage('auth-page');
+    }
+});
+
+// Run this when the page loads to set up icons and hide loaders
+document.addEventListener('DOMContentLoaded', function() {
+    lucide.createIcons();
     
-    document.getElementById('toast-container').appendChild(toast);
-    
+    // Hide loading screen after 1 second
     setTimeout(() => {
-        toast.remove();
-    }, 5000);
-}
+        const loader = document.getElementById('loading-screen');
+        if(loader) loader.style.display = 'none';
+    }, 1000);
+    
+    // Hide the config notice
+    const notice = document.getElementById('firebase-notice');
+    if(notice) notice.style.display = 'none';
+});
+
+// --- NAVIGATION & UTILITIES ---
 
 function showPage(pageId) {
-    document.querySelectorAll('.page').forEach(page => {
-        page.classList.remove('active');
-    });
+    document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
     document.getElementById(pageId).classList.add('active');
 }
 
-function setLoading(buttonId, loading) {
-    const button = document.getElementById(buttonId);
-    if (loading) {
-        button.disabled = true;
-        button.textContent = 'Processing...';
+function showToast(title, message, type = 'success') {
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `<div class="toast-title">${title}</div><div class="toast-message">${message}</div>`;
+    document.getElementById('toast-container').appendChild(toast);
+    setTimeout(() => toast.remove(), 5000);
+}
+
+function setLoading(buttonId, isLoading) {
+    const btn = document.getElementById(buttonId);
+    if (!btn) return;
+    if (isLoading) {
+        btn.dataset.original = btn.textContent;
+        btn.textContent = 'Processing...';
+        btn.disabled = true;
     } else {
-        button.disabled = false;
-        button.textContent = button.dataset.originalText || 'Submit';
+        btn.textContent = btn.dataset.original || 'Submit';
+        btn.disabled = false;
     }
 }
 
 function getBadgeClass(status) {
-    const statusMap = {
-        'pending': 'warning',
-        'approved': 'success',
-        'rejected': 'error',
-        'online': 'success',
-        'offline': 'secondary',
-        'busy': 'warning',
-        'delivered': 'success',
-        'preparing': 'warning',
-        'on_way': 'secondary',
-        'accepted': 'secondary',
-        'picked_up': 'warning',
-        'ready': 'success'
+    const map = {
+        'pending': 'warning', 'approved': 'success', 'rejected': 'error',
+        'online': 'success', 'offline': 'secondary', 'delivered': 'success',
+        'preparing': 'warning', 'ready': 'success', 'picked_up': 'warning'
     };
-    return statusMap[status] || 'secondary';
+    return map[status] || 'secondary';
 }
 
 function formatStatus(status) {
-    return status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+    return status ? status.replace('_', ' ').toUpperCase() : '';
 }
 
-// Authentication Functions
+// --- AUTH ACTIONS (LOGIN / REGISTER) ---
+
 function switchTab(tab) {
-    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-    document.querySelectorAll('.auth-form').forEach(form => form.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.auth-form').forEach(f => f.classList.remove('active'));
     
     if (tab === 'login') {
-        document.querySelector('.tab-btn').classList.add('active');
+        document.querySelector('.tab-btn:first-child').classList.add('active');
         document.getElementById('login-form').classList.add('active');
     } else {
         document.querySelectorAll('.tab-btn')[1].classList.add('active');
@@ -227,29 +121,15 @@ function switchTab(tab) {
 
 async function handleLogin(event) {
     event.preventDefault();
-    
     const email = document.getElementById('login-email').value;
     const password = document.getElementById('login-password').value;
     
     setLoading('login-btn', true);
-    
     try {
-        const result = await mockAuth.signInWithEmailAndPassword(email, password);
-        if (result.user) {
-            // Get user role from localStorage (mock Firestore)
-            const userRole = localStorage.getItem('userRole') || 'customer';
-            
-            currentUser = result.user;
-            currentUserRole = userRole;
-            
-            showToast('Login Successful', `Welcome back! Redirecting to ${userRole} dashboard...`);
-            
-            setTimeout(() => {
-                showDashboard(userRole);
-            }, 1500);
-        }
+        await auth.signInWithEmailAndPassword(email, password);
+        showToast('Success', 'Login successful');
     } catch (error) {
-        showToast('Error', error.message || 'Login failed', 'error');
+        showToast('Error', error.message, 'error');
     } finally {
         setLoading('login-btn', false);
     }
@@ -257,869 +137,477 @@ async function handleLogin(event) {
 
 async function handleRegister(event) {
     event.preventDefault();
-    
     const email = document.getElementById('register-email').value;
     const password = document.getElementById('register-password').value;
-    const confirmPassword = document.getElementById('confirm-password').value;
+    const confirm = document.getElementById('confirm-password').value;
     const role = document.getElementById('user-role').value;
     
-    if (password !== confirmPassword) {
-        showToast('Error', 'Passwords do not match', 'error');
-        return;
-    }
-    
-    if (!role) {
-        showToast('Error', 'Please select a role', 'error');
-        return;
-    }
+    if (password !== confirm) return showToast('Error', 'Passwords do not match', 'error');
+    if (!role) return showToast('Error', 'Select a role', 'error');
     
     setLoading('register-btn', true);
-    
     try {
-        const result = await mockAuth.createUserWithEmailAndPassword(email, password);
-        if (result.user) {
-            // Save user role to localStorage (mock Firestore)
-            localStorage.setItem('userRole', role);
-            localStorage.setItem('userEmail', email);
-            
-            currentUser = result.user;
-            currentUserRole = role;
-            
-            showToast('Registration Successful', `Account created! Redirecting to ${role} dashboard...`);
-            
-            setTimeout(() => {
-                showDashboard(role);
-            }, 1500);
+        const cred = await auth.createUserWithEmailAndPassword(email, password);
+        
+        // Save the Role
+        await db.collection('users').doc(cred.user.uid).set({
+            email: email,
+            role: role,
+            createdAt: new Date()
+        });
+
+        // If Restaurant, create profile
+        if (role === 'restaurant') {
+            await db.collection('restaurants').doc(cred.user.uid).set({
+                name: email.split('@')[0] + "'s Kitchen",
+                email: email,
+                status: 'pending',
+                cuisine: 'General',
+                deliveryFee: 5.00,
+                rating: 5.0
+            });
         }
+        
+        showToast('Success', 'Account created!');
     } catch (error) {
-        showToast('Error', error.message || 'Registration failed', 'error');
+        showToast('Error', error.message, 'error');
     } finally {
         setLoading('register-btn', false);
     }
 }
 
 async function logout() {
-    try {
-        await mockAuth.signOut();
-        currentUser = null;
-        currentUserRole = null;
-        localStorage.removeItem('userRole');
-        localStorage.removeItem('userEmail');
-        
-        showToast('Logged out', 'You have been logged out successfully.');
-        showPage('auth-page');
-    } catch (error) {
-        showToast('Error', 'Failed to log out', 'error');
-    }
+    await auth.signOut();
+    location.reload(); // Refresh page to clear memory
 }
 
-// Dashboard Functions
+// --- DASHBOARD ROUTING ---
+
 function showDashboard(role) {
-    const dashboardMap = {
+    const map = {
         'admin': 'admin-dashboard',
         'restaurant': 'restaurant-dashboard',
         'customer': 'customer-dashboard',
         'driver': 'driver-dashboard'
     };
+    showPage(map[role]);
     
-    const dashboardId = dashboardMap[role];
-    if (dashboardId) {
-        showPage(dashboardId);
-        initializeDashboard(role);
-    }
-}
-
-function initializeDashboard(role) {
-    switch (role) {
-        case 'admin':
-            loadAdminData();
-            break;
-        case 'restaurant':
-            loadRestaurantData();
-            break;
-        case 'customer':
-            loadCustomerData();
-            break;
-        case 'driver':
-            loadDriverData();
-            break;
-    }
+    // Initialize specific data
+    if (role === 'admin') loadAdminData();
+    if (role === 'restaurant') loadRestaurantData();
+    if (role === 'customer') loadCustomerData();
+    if (role === 'driver') loadDriverData();
 }
 
 function switchDashboardTab(tabName) {
-    // Remove active class from all tabs and content
-    document.querySelectorAll('.dashboard-tabs .tab-btn').forEach(btn => {
-        btn.classList.remove('active');
-    });
-    document.querySelectorAll('.tab-content').forEach(content => {
-        content.classList.remove('active');
-    });
+    // Hide all tabs
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll('.dashboard-tabs .tab-btn').forEach(b => b.classList.remove('active'));
     
-    // Add active class to clicked tab
+    // Show selected tab
+    document.getElementById(tabName + '-tab').classList.add('active');
     event.target.classList.add('active');
     
-    // Show corresponding content
-    const contentId = tabName + '-tab';
-    const content = document.getElementById(contentId);
-    if (content) {
-        content.classList.add('active');
-    }
-    
-    // Load specific data based on tab
-    switch (tabName) {
-        case 'restaurants':
-            loadRestaurantsTable();
-            break;
-        case 'orders':
-            loadOrdersTable();
-            break;
-        case 'drivers':
-            loadDriversTable();
-            break;
-        case 'restaurant-orders':
-            loadRestaurantOrders();
-            break;
-        case 'menu-management':
-            loadMenuItems();
-            break;
-        case 'restaurants-list':
-            loadRestaurantsList();
-            break;
-        case 'customer-orders':
-            loadCustomerOrders();
-            break;
-    }
+    // Load data
+    if (tabName === 'restaurants') loadRestaurantsTable();
+    if (tabName === 'orders') loadOrdersTable();
+    if (tabName === 'restaurant-orders') loadRestaurantOrders();
+    if (tabName === 'menu-management') loadMenuItems();
+    if (tabName === 'restaurants-list') loadRestaurantsList();
+    if (tabName === 'customer-orders') loadCustomerOrders();
 }
 
-// Admin Dashboard Functions
-function loadAdminData() {
-    loadRestaurantsTable();
-    updateAdminStats();
-}
+// --- ADMIN SECTION ---
 
-function updateAdminStats() {
-    const restaurants = mockData.restaurants;
-    const orders = mockData.orders;
-    const drivers = mockData.drivers;
-    
-    document.getElementById('total-restaurants').textContent = restaurants.length;
-    document.getElementById('total-orders').textContent = orders.length;
-    document.getElementById('active-drivers').textContent = drivers.filter(d => d.status === 'online').length;
-    
-    const totalRevenue = orders.reduce((sum, order) => sum + order.total, 0);
-    document.getElementById('total-revenue').textContent = `$${totalRevenue.toFixed(2)}`;
-}
-
-function loadRestaurantsTable() {
+async function loadRestaurantsTable() {
     const tbody = document.getElementById('restaurants-table');
+    tbody.innerHTML = 'Loading...';
+    
+    const snap = await db.collection('restaurants').get();
     tbody.innerHTML = '';
     
-    mockData.restaurants.forEach(restaurant => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td>${restaurant.name}</td>
-            <td>${restaurant.email}</td>
-            <td><span class="badge ${getBadgeClass(restaurant.status)}">${formatStatus(restaurant.status)}</span></td>
-            <td>${restaurant.createdAt}</td>
+    snap.forEach(doc => {
+        const r = doc.data();
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${r.name}</td>
+            <td>${r.email}</td>
+            <td><span class="badge ${getBadgeClass(r.status)}">${formatStatus(r.status)}</span></td>
+            <td>-</td>
             <td>
-                ${restaurant.status === 'pending' ? `
-                    <button class="btn btn-primary" style="margin-right: 0.5rem; padding: 0.25rem 0.75rem; font-size: 0.75rem;" onclick="handleRestaurantAction('${restaurant.id}', 'approve')">
-                        Approve
-                    </button>
-                    <button class="btn btn-outline" style="padding: 0.25rem 0.75rem; font-size: 0.75rem; border-color: var(--error); color: var(--error);" onclick="handleRestaurantAction('${restaurant.id}', 'reject')">
-                        Reject
-                    </button>
+                ${r.status === 'pending' ? `
+                <button class="btn btn-primary" onclick="adminApprove('${doc.id}', 'approved')">Approve</button>
+                <button class="btn btn-outline" onclick="adminApprove('${doc.id}', 'rejected')">Reject</button>
                 ` : ''}
             </td>
         `;
-        tbody.appendChild(row);
+        tbody.appendChild(tr);
     });
 }
 
-function loadOrdersTable() {
+async function adminApprove(id, status) {
+    await db.collection('restaurants').doc(id).update({ status: status });
+    loadRestaurantsTable();
+}
+
+async function loadOrdersTable() {
     const tbody = document.getElementById('orders-table');
+    tbody.innerHTML = 'Loading...';
+    const snap = await db.collection('orders').orderBy('createdAt', 'desc').limit(20).get();
     tbody.innerHTML = '';
     
-    mockData.orders.forEach(order => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td>#${order.id}</td>
-            <td>${order.restaurant}</td>
-            <td>${order.customer}</td>
-            <td>${order.driver || 'Unassigned'}</td>
-            <td><span class="badge ${getBadgeClass(order.status)}">${formatStatus(order.status)}</span></td>
-            <td>$${order.total}</td>
-            <td>${order.createdAt}</td>
+    snap.forEach(doc => {
+        const o = doc.data();
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>#${doc.id.slice(0,5)}</td>
+            <td>${o.restaurantName}</td>
+            <td>${o.customerEmail}</td>
+            <td>${o.driverEmail || 'None'}</td>
+            <td>${formatStatus(o.status)}</td>
+            <td>$${o.total}</td>
+            <td>-</td>
         `;
-        tbody.appendChild(row);
+        tbody.appendChild(tr);
     });
 }
 
-function loadDriversTable() {
-    const tbody = document.getElementById('drivers-table');
-    tbody.innerHTML = '';
-    
-    mockData.drivers.forEach(driver => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td>${driver.name}</td>
-            <td>${driver.email}</td>
-            <td><span class="badge ${getBadgeClass(driver.status)}">${formatStatus(driver.status)}</span></td>
-            <td>${driver.orders}</td>
-            <td>⭐ ${driver.rating}</td>
-        `;
-        tbody.appendChild(row);
-    });
-}
+// --- RESTAURANT SECTION ---
 
-function handleRestaurantAction(restaurantId, action) {
-    const restaurant = mockData.restaurants.find(r => r.id === restaurantId);
-    if (restaurant) {
-        restaurant.status = action === 'approve' ? 'approved' : 'rejected';
-        showToast(`Restaurant ${action}d`, `The restaurant has been ${action}d successfully.`);
-        loadRestaurantsTable();
-        updateAdminStats();
-    }
-}
-
-// Restaurant Dashboard Functions
 function loadRestaurantData() {
     loadRestaurantOrders();
-    updateRestaurantStats();
+    // Real-time listener for new orders
+    db.collection('orders')
+      .where('restaurantId', '==', auth.currentUser.uid)
+      .onSnapshot(() => loadRestaurantOrders());
 }
 
-function updateRestaurantStats() {
-    const menuItems = mockData.menuItems['1'] || []; // Assuming current restaurant is Pizza Palace
-    const orders = mockData.orders.filter(o => o.restaurant === 'Pizza Palace');
+async function loadRestaurantOrders() {
+    const div = document.getElementById('restaurant-orders-list');
+    const snap = await db.collection('orders')
+        .where('restaurantId', '==', auth.currentUser.uid)
+        .orderBy('createdAt', 'desc')
+        .get();
+        
+    div.innerHTML = '';
+    if (snap.empty) div.innerHTML = '<p>No orders found.</p>';
     
-    document.getElementById('menu-items-count').textContent = menuItems.length;
-    document.getElementById('pending-orders').textContent = orders.filter(o => o.status === 'pending').length;
-    document.getElementById('active-orders').textContent = orders.filter(o => ['accepted', 'preparing'].includes(o.status)).length;
-    
-    const revenue = orders.reduce((sum, order) => sum + order.total, 0);
-    document.getElementById('restaurant-revenue').textContent = `$${revenue.toFixed(2)}`;
-}
-
-function loadRestaurantOrders() {
-    const container = document.getElementById('restaurant-orders-list');
-    container.innerHTML = '';
-    
-    const restaurantOrders = mockData.orders.filter(o => o.restaurant === 'Pizza Palace');
-    
-    restaurantOrders.forEach(order => {
-        const orderCard = document.createElement('div');
-        orderCard.className = 'order-card';
-        orderCard.innerHTML = `
+    snap.forEach(doc => {
+        const o = doc.data();
+        const card = document.createElement('div');
+        card.className = 'order-card';
+        card.innerHTML = `
             <div class="order-header">
-                <div class="order-info">
-                    <h4>Order #${order.id}</h4>
-                    <p class="order-id">${order.customer}</p>
-                </div>
-                <div class="order-total">
-                    <span class="badge ${getBadgeClass(order.status)}">${formatStatus(order.status)}</span>
-                    <p style="margin-top: 0.5rem; font-weight: bold;">$${order.total}</p>
-                </div>
+                <h4>Order #${doc.id.slice(0,5)}</h4>
+                <span class="badge ${getBadgeClass(o.status)}">${formatStatus(o.status)}</span>
             </div>
-            <div class="order-items">
-                <p class="order-items-label">Items:</p>
-                <p class="order-items-list">${order.items.join(', ')}</p>
-            </div>
-            <div class="order-meta">
-                <span>${order.createdAt}</span>
-            </div>
+            <p>Customer: ${o.customerEmail}</p>
+            <p>Items: ${o.items.map(i => i.name).join(', ')}</p>
+            <p>Total: $${o.total}</p>
             <div class="order-actions">
-                ${getRestaurantOrderActions(order)}
+                ${o.status === 'pending' ? `
+                    <button class="btn btn-primary" onclick="updateOrderStatus('${doc.id}', 'accepted')">Accept</button>
+                    <button class="btn btn-outline" onclick="updateOrderStatus('${doc.id}', 'rejected')">Reject</button>` : ''}
+                ${o.status === 'accepted' ? `<button class="btn btn-primary" onclick="updateOrderStatus('${doc.id}', 'preparing')">Start Preparing</button>` : ''}
+                ${o.status === 'preparing' ? `<button class="btn btn-primary" onclick="updateOrderStatus('${doc.id}', 'ready')">Mark Ready for Driver</button>` : ''}
             </div>
         `;
-        container.appendChild(orderCard);
+        div.appendChild(card);
     });
 }
 
-function getRestaurantOrderActions(order) {
-    switch (order.status) {
-        case 'pending':
-            return `
-                <button class="btn btn-primary" style="margin-right: 0.5rem;" onclick="handleRestaurantOrderAction('${order.id}', 'accepted')">Accept</button>
-                <button class="btn btn-outline" style="border-color: var(--error); color: var(--error);" onclick="handleRestaurantOrderAction('${order.id}', 'rejected')">Reject</button>
-            `;
-        case 'accepted':
-            return `<button class="btn btn-primary" onclick="handleRestaurantOrderAction('${order.id}', 'preparing')">Start Preparing</button>`;
-        case 'preparing':
-            return `<button class="btn btn-primary" onclick="handleRestaurantOrderAction('${order.id}', 'ready')">Mark Ready</button>`;
-        default:
-            return '';
-    }
+async function updateOrderStatus(id, status) {
+    await db.collection('orders').doc(id).update({ status: status });
+    showToast('Updated', `Order marked as ${status}`);
 }
 
-function handleRestaurantOrderAction(orderId, newStatus) {
-    const order = mockData.orders.find(o => o.id === orderId);
-    if (order) {
-        order.status = newStatus;
-        showToast(`Order ${newStatus}`, `Order #${orderId} has been marked as ${newStatus}.`);
-        loadRestaurantOrders();
-        updateRestaurantStats();
-    }
-}
+// --- RESTAURANT MENU ---
 
-function loadMenuItems() {
-    const container = document.getElementById('menu-items-list');
-    container.innerHTML = '';
+async function loadMenuItems() {
+    const list = document.getElementById('menu-items-list');
+    const snap = await db.collection('menuItems').where('restaurantId', '==', auth.currentUser.uid).get();
     
-    const menuItems = mockData.menuItems['1'] || [];
-    
-    menuItems.forEach(item => {
-        const itemCard = document.createElement('div');
-        itemCard.className = 'menu-item-card';
-        itemCard.innerHTML = `
-            <div class="menu-item-content">
-                <div class="menu-item-info">
-                    <div class="menu-item-name">${item.name}</div>
-                    <div class="menu-item-description">${item.description}</div>
-                    <div class="menu-item-price">$${item.price}</div>
-                    <span class="badge ${item.available ? 'success' : 'secondary'}" style="margin-top: 0.5rem;">
-                        ${item.available ? 'Available' : 'Unavailable'}
-                    </span>
-                </div>
-                <div class="menu-item-actions">
-                    <button class="btn btn-outline" onclick="editMenuItem('${item.id}')" style="margin-right: 0.5rem;">
-                        Edit
-                    </button>
-                    <button class="btn btn-outline" style="border-color: var(--error); color: var(--error);" onclick="deleteMenuItem('${item.id}')">
-                        Delete
-                    </button>
-                </div>
+    list.innerHTML = '';
+    snap.forEach(doc => {
+        const item = doc.data();
+        const card = document.createElement('div');
+        card.className = 'menu-item-card';
+        card.innerHTML = `
+            <div>
+                <b>${item.name}</b><br>${item.description}<br>$${item.price}
             </div>
+            <button class="btn btn-outline" onclick="deleteMenuItem('${doc.id}')">Delete</button>
         `;
-        container.appendChild(itemCard);
+        list.appendChild(card);
     });
 }
 
-function showAddItemModal() {
-    document.getElementById('add-item-modal').classList.add('active');
-}
+function showAddItemModal() { document.getElementById('add-item-modal').classList.add('active'); }
+function hideAddItemModal() { document.getElementById('add-item-modal').classList.remove('active'); }
 
-function hideAddItemModal() {
-    document.getElementById('add-item-modal').classList.remove('active');
-    document.getElementById('add-item-modal').querySelector('form').reset();
-}
-
-function addMenuItem(event) {
-    event.preventDefault();
-    
+async function addMenuItem(e) {
+    e.preventDefault();
     const name = document.getElementById('item-name').value;
-    const description = document.getElementById('item-description').value;
-    const price = parseFloat(document.getElementById('item-price').value);
-    const category = document.getElementById('item-category').value;
+    const desc = document.getElementById('item-description').value;
+    const price = document.getElementById('item-price').value;
     
-    const newItem = {
-        id: Date.now().toString(),
-        name,
-        description,
-        price,
-        category,
+    await db.collection('menuItems').add({
+        restaurantId: auth.currentUser.uid,
+        name: name,
+        description: desc,
+        price: parseFloat(price),
         available: true
-    };
+    });
     
-    if (!mockData.menuItems['1']) {
-        mockData.menuItems['1'] = [];
-    }
-    mockData.menuItems['1'].push(newItem);
-    
-    showToast('Menu item added', 'The new menu item has been added successfully.');
     hideAddItemModal();
     loadMenuItems();
-    updateRestaurantStats();
+    showToast('Success', 'Item Added');
 }
 
-function editMenuItem(itemId) {
-    showToast('Edit Item', 'Edit functionality would open a modal with item details', 'warning');
-}
-
-function deleteMenuItem(itemId) {
-    if (confirm('Are you sure you want to delete this menu item?')) {
-        mockData.menuItems['1'] = mockData.menuItems['1'].filter(item => item.id !== itemId);
-        showToast('Menu item deleted', 'The menu item has been deleted successfully.');
+async function deleteMenuItem(id) {
+    if(confirm('Delete?')) {
+        await db.collection('menuItems').doc(id).delete();
         loadMenuItems();
-        updateRestaurantStats();
     }
 }
 
-// Customer Dashboard Functions
+// --- CUSTOMER SECTION ---
+
 function loadCustomerData() {
     loadRestaurantsList();
-    updateCartDisplay();
+    loadCustomerOrders();
 }
 
-function loadRestaurantsList() {
-    const container = document.getElementById('restaurants-grid');
-    container.innerHTML = '';
+async function loadRestaurantsList() {
+    const grid = document.getElementById('restaurants-grid');
+    grid.innerHTML = 'Loading...';
     
-    const approvedRestaurants = mockData.restaurants.filter(r => r.status === 'approved');
+    const snap = await db.collection('restaurants').where('status', '==', 'approved').get();
+    grid.innerHTML = '';
     
-    approvedRestaurants.forEach(restaurant => {
-        const restaurantCard = document.createElement('div');
-        restaurantCard.className = 'restaurant-card';
-        restaurantCard.onclick = () => selectRestaurant(restaurant.id);
-        restaurantCard.innerHTML = `
-            <div class="restaurant-image">
-                🍽️
-            </div>
+    snap.forEach(doc => {
+        const r = doc.data();
+        const card = document.createElement('div');
+        card.className = 'restaurant-card';
+        card.onclick = () => openRestaurantMenu(doc.id, r);
+        card.innerHTML = `
+            <div class="restaurant-image">🍽️</div>
             <div class="restaurant-info">
-                <div class="restaurant-header">
-                    <div class="restaurant-name">${restaurant.name}</div>
-                    <div class="restaurant-rating">
-                        ⭐ ${restaurant.rating}
-                    </div>
-                </div>
-                <div class="restaurant-cuisine">${restaurant.cuisine}</div>
-                <div class="restaurant-details">
-                    <div>🕒 ${restaurant.deliveryTime}</div>
-                    <div>Delivery: $${restaurant.deliveryFee}</div>
-                </div>
+                <h3>${r.name}</h3>
+                <p>${r.cuisine}</p>
+                <small>Fee: $${r.deliveryFee}</small>
             </div>
         `;
-        container.appendChild(restaurantCard);
+        grid.appendChild(card);
     });
 }
 
-function filterRestaurants() {
-    const searchTerm = document.getElementById('restaurant-search').value.toLowerCase();
-    const restaurantCards = document.querySelectorAll('.restaurant-card');
-    
-    restaurantCards.forEach(card => {
-        const name = card.querySelector('.restaurant-name').textContent.toLowerCase();
-        const cuisine = card.querySelector('.restaurant-cuisine').textContent.toLowerCase();
-        
-        if (name.includes(searchTerm) || cuisine.includes(searchTerm)) {
-            card.style.display = 'block';
-        } else {
-            card.style.display = 'none';
-        }
-    });
-}
-
-function selectRestaurant(restaurantId) {
-    selectedRestaurant = restaurantId;
-    const restaurant = mockData.restaurants.find(r => r.id === restaurantId);
-    
+async function openRestaurantMenu(id, restaurant) {
+    selectedRestaurant = { id: id, ...restaurant };
     document.getElementById('restaurants-view').style.display = 'none';
     document.getElementById('restaurant-menu-view').style.display = 'block';
-    
     document.getElementById('selected-restaurant-name').textContent = restaurant.name;
-    document.getElementById('selected-restaurant-details').textContent = `${restaurant.cuisine} • ${restaurant.deliveryTime}`;
     document.getElementById('cart-restaurant-name').textContent = restaurant.name;
     
-    loadRestaurantMenu(restaurantId);
-    updateCartDisplay();
+    // Load Menu
+    const grid = document.getElementById('menu-items-grid');
+    grid.innerHTML = 'Loading...';
+    const snap = await db.collection('menuItems').where('restaurantId', '==', id).get();
+    
+    grid.innerHTML = '';
+    snap.forEach(doc => {
+        const item = doc.data();
+        const card = document.createElement('div');
+        card.className = 'menu-item-card';
+        card.innerHTML = `
+            <div>
+                <b>${item.name}</b><br>${item.description}<br>$${item.price}
+            </div>
+            <button class="btn btn-primary" onclick="addToCart('${doc.id}', '${item.name}', ${item.price})">Add</button>
+        `;
+        grid.appendChild(card);
+    });
 }
 
 function backToRestaurants() {
-    selectedRestaurant = null;
-    cart = {};
-    
     document.getElementById('restaurants-view').style.display = 'block';
     document.getElementById('restaurant-menu-view').style.display = 'none';
-    
+    cart = {};
     updateCartDisplay();
 }
 
-function loadRestaurantMenu(restaurantId) {
-    const container = document.getElementById('menu-items-grid');
-    container.innerHTML = '';
-    
-    const menuItems = mockData.menuItems[restaurantId] || [];
-    
-    menuItems.forEach(item => {
-        const itemCard = document.createElement('div');
-        itemCard.className = 'menu-item-card';
-        itemCard.innerHTML = `
-            <div class="menu-item-content">
-                <div class="menu-item-info">
-                    <div class="menu-item-name">${item.name}</div>
-                    <div class="menu-item-description">${item.description}</div>
-                    <div class="menu-item-price">$${item.price}</div>
-                </div>
-                <div class="menu-item-actions">
-                    ${cart[item.id] > 0 ? `
-                        <button class="btn btn-outline" onclick="removeFromCart('${item.id}')">-</button>
-                        <span class="quantity-display">${cart[item.id]}</span>
-                    ` : ''}
-                    <button class="btn btn-primary" onclick="addToCart('${item.id}')">+</button>
-                </div>
-            </div>
-        `;
-        container.appendChild(itemCard);
-    });
-}
+// --- CART LOGIC ---
 
-function addToCart(itemId) {
-    if (!cart[itemId]) {
-        cart[itemId] = 0;
-    }
-    cart[itemId]++;
-    
-    showToast('Item added to cart', 'The item has been added to your cart.');
-    loadRestaurantMenu(selectedRestaurant);
-    updateCartDisplay();
-}
-
-function removeFromCart(itemId) {
-    if (cart[itemId] > 1) {
-        cart[itemId]--;
-    } else {
-        delete cart[itemId];
-    }
-    
-    loadRestaurantMenu(selectedRestaurant);
+function addToCart(id, name, price) {
+    if (!cart[id]) cart[id] = { name, price, qty: 0 };
+    cart[id].qty++;
     updateCartDisplay();
 }
 
 function updateCartDisplay() {
-    const cartItems = document.getElementById('cart-items');
-    const cartTotal = document.getElementById('cart-total');
-    const cartButton = document.getElementById('cart-button');
-    const cartCount = document.getElementById('cart-count');
+    const container = document.getElementById('cart-items');
+    const totalEl = document.getElementById('final-total');
+    let total = 0;
+    let html = '';
+    let count = 0;
     
-    const itemCount = Object.values(cart).reduce((sum, qty) => sum + qty, 0);
-    
-    if (itemCount === 0) {
-        cartItems.innerHTML = '<p class="empty-cart">Your cart is empty</p>';
-        cartTotal.style.display = 'none';
-        cartButton.style.display = 'none';
-    } else {
-        cartButton.style.display = 'flex';
-        cartCount.textContent = itemCount;
-        
-        let cartHTML = '';
-        let subtotal = 0;
-        
-        Object.entries(cart).forEach(([itemId, quantity]) => {
-            const item = findMenuItem(itemId);
-            if (item) {
-                const itemTotal = item.price * quantity;
-                subtotal += itemTotal;
-                
-                cartHTML += `
-                    <div class="cart-item">
-                        <div class="cart-item-info">
-                            <div class="cart-item-name">${item.name}</div>
-                            <div class="cart-item-quantity">x${quantity}</div>
-                        </div>
-                        <div class="cart-item-price">$${itemTotal.toFixed(2)}</div>
-                    </div>
-                `;
-            }
-        });
-        
-        cartItems.innerHTML = cartHTML;
-        
-        const restaurant = mockData.restaurants.find(r => r.id === selectedRestaurant);
-        const deliveryFee = restaurant ? restaurant.deliveryFee : 0;
-        const total = subtotal + deliveryFee;
-        
-        document.getElementById('subtotal').textContent = `$${subtotal.toFixed(2)}`;
-        document.getElementById('delivery-fee').textContent = `$${deliveryFee.toFixed(2)}`;
-        document.getElementById('final-total').textContent = `$${total.toFixed(2)}`;
-        
-        cartTotal.style.display = 'block';
-    }
-}
-
-function findMenuItem(itemId) {
-    for (const restaurantId in mockData.menuItems) {
-        const item = mockData.menuItems[restaurantId].find(item => item.id === itemId);
-        if (item) return item;
-    }
-    return null;
-}
-
-function placeOrder() {
-    if (Object.keys(cart).length === 0) {
-        showToast('Empty cart', 'Please add items to your cart before placing an order.', 'error');
-        return;
-    }
-    
-    const restaurant = mockData.restaurants.find(r => r.id === selectedRestaurant);
-    const orderItems = Object.entries(cart).map(([itemId, quantity]) => {
-        const item = findMenuItem(itemId);
-        return `${item.name} (x${quantity})`;
+    Object.keys(cart).forEach(key => {
+        const item = cart[key];
+        total += item.price * item.qty;
+        count += item.qty;
+        html += `<div class="cart-item">
+            <span>${item.name} x${item.qty}</span>
+            <span>$${(item.price * item.qty).toFixed(2)}</span>
+        </div>`;
     });
     
-    // Add order to mock data
-    const newOrder = {
-        id: Date.now().toString(),
-        restaurant: restaurant.name,
-        customer: localStorage.getItem('userEmail') || 'customer@example.com',
-        items: orderItems,
+    const fee = selectedRestaurant ? selectedRestaurant.deliveryFee : 0;
+    
+    container.innerHTML = html || '<p>Empty Cart</p>';
+    document.getElementById('subtotal').textContent = `$${total.toFixed(2)}`;
+    document.getElementById('delivery-fee').textContent = `$${fee.toFixed(2)}`;
+    document.getElementById('final-total').textContent = `$${(total + fee).toFixed(2)}`;
+    document.getElementById('cart-count').textContent = count;
+    
+    if(count > 0) {
+        document.getElementById('cart-button').style.display = 'flex';
+        document.getElementById('cart-total').style.display = 'block';
+    }
+}
+
+async function placeOrder() {
+    if (Object.keys(cart).length === 0) return;
+    
+    const total = parseFloat(document.getElementById('final-total').textContent.replace('$', ''));
+    const itemsList = [];
+    Object.values(cart).forEach(i => itemsList.push({ name: i.name, qty: i.qty }));
+    
+    await db.collection('orders').add({
+        restaurantId: selectedRestaurant.id,
+        restaurantName: selectedRestaurant.name,
+        customerId: auth.currentUser.uid,
+        customerEmail: auth.currentUser.email,
+        driverId: null, // No driver yet
+        items: itemsList,
+        total: total,
         status: 'pending',
-        total: parseFloat(document.getElementById('final-total').textContent.replace('$', '')),
-        createdAt: new Date().toLocaleString()
-    };
-    
-    mockData.orders.push(newOrder);
-    
-    showToast('Order placed successfully!', `Your order from ${restaurant.name} has been placed.`);
+        createdAt: new Date()
+    });
     
     cart = {};
     updateCartDisplay();
+    backToRestaurants();
+    showToast('Success', 'Order Placed');
 }
 
-function loadCustomerOrders() {
-    const container = document.getElementById('customer-orders-list');
-    container.innerHTML = '';
+async function loadCustomerOrders() {
+    const div = document.getElementById('customer-orders-list');
+    const snap = await db.collection('orders').where('customerId', '==', auth.currentUser.uid).orderBy('createdAt', 'desc').get();
     
-    const customerEmail = localStorage.getItem('userEmail') || 'customer@example.com';
-    const customerOrders = mockData.orders.filter(o => o.customer === customerEmail);
-    
-    if (customerOrders.length === 0) {
-        container.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 2rem 0;">No orders yet</p>';
-        return;
-    }
-    
-    customerOrders.forEach(order => {
-        const orderCard = document.createElement('div');
-        orderCard.className = 'order-card';
-        orderCard.innerHTML = `
-            <div class="order-header">
-                <div class="order-info">
-                    <h4>Order #${order.id}</h4>
-                    <p class="order-id">${order.restaurant}</p>
-                </div>
-                <span class="badge ${getBadgeClass(order.status)}">${formatStatus(order.status)}</span>
-            </div>
-            <div class="order-items">
-                <p class="order-items-list">${order.items.join(', ')}</p>
-            </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem;">
-                <p style="font-size: 0.75rem; color: var(--text-muted);">${order.createdAt}</p>
-                <p style="font-weight: bold;">$${order.total}</p>
-            </div>
+    div.innerHTML = '';
+    snap.forEach(doc => {
+        const o = doc.data();
+        const card = document.createElement('div');
+        card.className = 'order-card';
+        card.innerHTML = `
+            <b>${o.restaurantName}</b>
+            <span class="badge ${getBadgeClass(o.status)}">${formatStatus(o.status)}</span>
+            <p>Total: $${o.total}</p>
         `;
-        container.appendChild(orderCard);
+        div.appendChild(card);
     });
 }
 
-// Driver Dashboard Functions
-function loadDriverData() {
-    loadAvailableOrders();
-    loadMyOrders();
-    updateDriverStats();
-}
+// --- DRIVER SECTION ---
 
-function updateDriverStats() {
-    const availableCount = isDriverOnline ? mockData.availableOrders.length : 0;
-    document.getElementById('available-orders-count').textContent = availableCount;
-    document.getElementById('available-orders-desc').textContent = isDriverOnline ? 'Ready to accept' : 'Go online to see orders';
-    document.getElementById('active-deliveries').textContent = mockData.myOrders.length;
+function loadDriverData() {
+    const toggle = document.getElementById('driver-online-status');
+    if (toggle) toggle.checked = isDriverOnline;
+    document.getElementById('driver-status-text').textContent = isDriverOnline ? "Online" : "Offline";
+    document.getElementById('offline-notice').style.display = isDriverOnline ? 'none' : 'block';
     
-    const statusText = isDriverOnline ? 'Online' : 'Offline';
-    document.getElementById('driver-status-display').textContent = statusText;
-    document.getElementById('driver-status-desc').textContent = isDriverOnline ? 'Receiving orders' : 'Not receiving orders';
-    document.getElementById('driver-status-text').textContent = statusText;
-    
-    // Update offline notice
-    const offlineNotice = document.getElementById('offline-notice');
-    offlineNotice.style.display = isDriverOnline ? 'none' : 'block';
-    
-    // Update available orders description
-    document.getElementById('available-orders-description').textContent = 
-        isDriverOnline ? 'Orders waiting for pickup' : 'Go online to see available orders';
+    if (isDriverOnline) loadAvailableDriverOrders();
+    loadMyDeliveries();
 }
 
 function toggleDriverStatus() {
-    isDriverOnline = document.getElementById('driver-online-status').checked;
-    
-    showToast(
-        isDriverOnline ? "You're now online" : "You're now offline",
-        isDriverOnline ? "You can now receive order notifications" : "You won't receive new orders"
-    );
-    
-    updateDriverStats();
-    loadAvailableOrders();
+    isDriverOnline = !isDriverOnline;
+    loadDriverData();
 }
 
-function loadAvailableOrders() {
-    const container = document.getElementById('available-orders-list');
-    container.innerHTML = '';
-    
+async function loadAvailableDriverOrders() {
+    const div = document.getElementById('available-orders-list');
     if (!isDriverOnline) {
-        container.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 2rem 0;">You\'re offline</p>';
+        div.innerHTML = '<p>You are offline.</p>';
         return;
     }
     
-    if (mockData.availableOrders.length === 0) {
-        container.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 2rem 0;">No orders available</p>';
-        return;
-    }
-    
-    mockData.availableOrders.forEach(order => {
-        const orderCard = document.createElement('div');
-        orderCard.className = 'order-card available';
-        orderCard.innerHTML = `
-            <div class="order-header">
-                <div class="order-info">
-                    <h4>${order.restaurant}</h4>
-                    <p class="order-id">Order #${order.id}</p>
-                </div>
-                <div class="order-total">
-                    <div class="order-amount">$${order.total}</div>
-                    <div class="order-earning">Est. $${(order.total * 0.15).toFixed(2)} earning</div>
-                </div>
-            </div>
-            <div class="order-addresses">
-                <div class="address-line">
-                    📍 Pickup: ${order.restaurantAddress}
-                </div>
-                <div class="address-line">
-                    📍 Delivery: ${order.customerAddress}
-                </div>
-            </div>
-            <div class="order-meta">
-                <span>🚗 ${order.distance}</span>
-                <span>🕒 ${order.estimatedTime}</span>
-            </div>
-            <div class="order-items">
-                <p class="order-items-label">Items:</p>
-                <p class="order-items-list">${order.items.join(', ')}</p>
-            </div>
-            <button class="btn btn-primary btn-full" onclick="acceptOrder('${order.id}')">
-                Accept Order
-            </button>
-        `;
-        container.appendChild(orderCard);
-    });
-}
-
-function loadMyOrders() {
-    const container = document.getElementById('my-orders-list');
-    container.innerHTML = '';
-    
-    if (mockData.myOrders.length === 0) {
-        container.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 2rem 0;">No active deliveries</p>';
-        return;
-    }
-    
-    mockData.myOrders.forEach(order => {
-        const orderCard = document.createElement('div');
-        orderCard.className = 'order-card active';
-        orderCard.innerHTML = `
-            <div class="order-header">
-                <div class="order-info">
-                    <h4>${order.restaurant}</h4>
-                    <p class="order-id">Order #${order.id}</p>
-                </div>
-                <div class="order-total">
-                    <span class="badge ${getBadgeClass(order.status)}">${formatStatus(order.status)}</span>
-                    <div class="order-amount" style="margin-top: 0.5rem;">$${order.total}</div>
-                </div>
-            </div>
-            <div class="order-addresses">
-                <div class="address-line">
-                    📍 Pickup: ${order.restaurantAddress}
-                </div>
-                <div class="address-line">
-                    📍 Delivery: ${order.customerAddress}
-                </div>
-            </div>
-            <div class="order-meta">
-                <span>🚗 ${order.distance}</span>
-                <span>🕒 ${order.estimatedTime}</span>
-            </div>
-            <div class="order-items">
-                <p class="order-items-label">Items:</p>
-                <p class="order-items-list">${order.items.join(', ')}</p>
-            </div>
-            ${getDriverOrderActions(order)}
-        `;
-        container.appendChild(orderCard);
-    });
-}
-
-function getDriverOrderActions(order) {
-    const actions = {
-        'accepted': { action: 'picked_up', label: 'Mark as Picked Up' },
-        'picked_up': { action: 'on_way', label: 'On the Way' },
-        'on_way': { action: 'delivered', label: 'Mark as Delivered' }
-    };
-    
-    const nextAction = actions[order.status];
-    if (nextAction) {
-        return `
-            <button class="btn btn-primary btn-full" onclick="updateOrderStatus('${order.id}', '${nextAction.action}')">
-                ${nextAction.label}
-            </button>
-        `;
-    }
-    return '';
-}
-
-function acceptOrder(orderId) {
-    const order = mockData.availableOrders.find(o => o.id === orderId);
-    if (order) {
-        // Move from available to my orders
-        mockData.availableOrders = mockData.availableOrders.filter(o => o.id !== orderId);
-        mockData.myOrders.push({ ...order, status: 'accepted' });
+    div.innerHTML = 'Searching...';
+    // Find orders that are ready but have no driver
+    const snap = await db.collection('orders')
+        .where('status', '==', 'ready')
+        .get();
         
-        showToast('Order accepted!', `You've accepted the order from ${order.restaurant}`);
-        
-        loadAvailableOrders();
-        loadMyOrders();
-        updateDriverStats();
-    }
-}
-
-function updateOrderStatus(orderId, newStatus) {
-    const order = mockData.myOrders.find(o => o.id === orderId);
-    if (order) {
-        order.status = newStatus;
-        
-        if (newStatus === 'delivered') {
-            // Add to earnings and remove from active orders
-            const currentEarnings = parseFloat(document.getElementById('driver-earnings').textContent.replace('$', ''));
-            const newEarnings = currentEarnings + (order.total * 0.15);
-            document.getElementById('driver-earnings').textContent = `$${newEarnings.toFixed(2)}`;
-            
-            // Remove from my orders after a delay
-            setTimeout(() => {
-                mockData.myOrders = mockData.myOrders.filter(o => o.id !== orderId);
-                loadMyOrders();
-                updateDriverStats();
-            }, 2000);
+    div.innerHTML = '';
+    let found = false;
+    
+    snap.forEach(doc => {
+        const o = doc.data();
+        // Manual filter for no driver (safer for Firestore indexes)
+        if (!o.driverId) {
+            found = true;
+            const card = document.createElement('div');
+            card.className = 'order-card available';
+            card.innerHTML = `
+                <h4>${o.restaurantName}</h4>
+                <p>Deliver to: ${o.customerEmail}</p>
+                <p>Pay: $${(o.total * 0.2).toFixed(2)}</p>
+                <button class="btn btn-primary btn-full" onclick="driverAccept('${doc.id}')">Accept</button>
+            `;
+            div.appendChild(card);
         }
-        
-        showToast('Status updated', `Order marked as ${newStatus.replace('_', ' ')}`);
-        loadMyOrders();
-    }
-}
-
-// Firebase Notice Functions
-function hideFirebaseNotice() {
-    document.getElementById('firebase-notice').style.display = 'none';
-}
-
-// Initialize App
-document.addEventListener('DOMContentLoaded', function() {
-    // Initialize Lucide icons
-    lucide.createIcons();
-    
-    // Hide loading screen
-    setTimeout(() => {
-        document.getElementById('loading-screen').style.display = 'none';
-    }, 1000);
-    
-    // Check if user is already logged in (mock)
-    const savedRole = localStorage.getItem('userRole');
-    if (savedRole) {
-        currentUserRole = savedRole;
-        currentUser = { email: localStorage.getItem('userEmail') };
-        showDashboard(savedRole);
-        hideFirebaseNotice();
-    } else {
-        showPage('auth-page');
-    }
-    
-    // Set original button text for loading states
-    document.querySelectorAll('.btn').forEach(btn => {
-        btn.dataset.originalText = btn.textContent;
     });
-});
+    
+    if (!found) div.innerHTML = '<p>No orders ready for pickup.</p>';
+}
+
+async function driverAccept(id) {
+    await db.collection('orders').doc(id).update({
+        driverId: auth.currentUser.uid,
+        driverEmail: auth.currentUser.email,
+        status: 'picked_up'
+    });
+    loadDriverData();
+    showToast('Success', 'Order Accepted');
+}
+
+async function loadMyDeliveries() {
+    const div = document.getElementById('my-orders-list');
+    const snap = await db.collection('orders')
+        .where('driverId', '==', auth.currentUser.uid)
+        .where('status', 'in', ['picked_up', 'on_way'])
+        .get();
+        
+    div.innerHTML = '';
+    snap.forEach(doc => {
+        const o = doc.data();
+        const card = document.createElement('div');
+        card.className = 'order-card active';
+        card.innerHTML = `
+            <h4>From: ${o.restaurantName}</h4>
+            <p>To: ${o.customerEmail}</p>
+            <span class="badge ${getBadgeClass(o.status)}">${formatStatus(o.status)}</span>
+            <div style="margin-top:10px">
+                ${o.status === 'picked_up' ? 
+                `<button class="btn btn-primary btn-full" onclick="driverUpdate('${doc.id}', 'on_way')">On Way</button>` :
+                `<button class="btn btn-primary btn-full" onclick="driverUpdate('${doc.id}', 'delivered')">Delivered</button>`}
+            </div>
+        `;
+        div.appendChild(card);
+    });
+}
+
+async function driverUpdate(id, status) {
+    await db.collection('orders').doc(id).update({ status: status });
+    loadDriverData();
+}
