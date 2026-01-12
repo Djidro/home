@@ -1,19 +1,21 @@
-// Talabat Food Delivery App JavaScript - FINAL VERSION
+// Talabat Food Delivery App JavaScript - FINAL CORRECTED VERSION
 
 // 1. FIREBASE CONFIGURATION
-// This connects your specific project (Samail) to the app.
 const firebaseConfig = {
-  apiKey: "AIzaSyC_1B_UMLD670HB86qOqTm9e9G50IoTuCI",
-  authDomain: "samail-e3e1d.firebaseapp.com",
-  projectId: "samail-e3e1d",
-  storageBucket: "samail-e3e1d.firebasestorage.app",
-  messagingSenderId: "526248644310",
-  appId: "1:526248644310:web:e8e8b9d984bda4dc098377",
-  measurementId: "G-3ESFX89BLS"
+  apiKey: "AIzaSyBNDBNa8Hdaqv7PPKoJjdnDHymnXqUYOXo",
+  authDomain: "mytalabatapp-ad5a5.firebaseapp.com",
+  projectId: "mytalabatapp-ad5a5",
+  storageBucket: "mytalabatapp-ad5a5.firebasestorage.app",
+  messagingSenderId: "891231122044",
+  appId: "1:891231122044:web:1447d56a4a579606060ff9"
 };
 
-// 2. INITIALIZE FIREBASE
-firebase.initializeApp(firebaseConfig);
+// 2. INITIALIZE FIREBASE (Compat Mode)
+// Check if apps are already initialized to prevent reloading errors
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
+
 const auth = firebase.auth();
 const db = firebase.firestore();
 
@@ -21,12 +23,11 @@ const db = firebase.firestore();
 let currentUser = null;
 let currentUserRole = null;
 let selectedRestaurant = null;
-let cart = {}; // Stores items like { 'itemId': {name: 'Pizza', price: 10, qty: 1} }
+let cart = {}; 
 let isDriverOnline = false;
 
 // --- AUTHENTICATION & STARTUP ---
 
-// This runs automatically whenever the user logs in, logs out, or refreshes the page
 auth.onAuthStateChanged(async (user) => {
     if (user) {
         currentUser = user;
@@ -37,8 +38,13 @@ auth.onAuthStateChanged(async (user) => {
             localStorage.setItem('userRole', currentUserRole);
             localStorage.setItem('userEmail', user.email);
             
+            // Restore restaurant selection if refreshing page
+            const savedRest = localStorage.getItem('selectedRestaurant');
+            if (savedRest) selectedRestaurant = JSON.parse(savedRest);
+
             // If we are still on the login screen, move to dashboard
-            if (document.getElementById('auth-page').classList.contains('active')) {
+            const authPage = document.getElementById('auth-page');
+            if (authPage && authPage.classList.contains('active')) {
                 showDashboard(currentUserRole);
             }
         }
@@ -48,9 +54,12 @@ auth.onAuthStateChanged(async (user) => {
     }
 });
 
-// Run this when the page loads to set up icons and hide loaders
+// Run this when the page loads
 document.addEventListener('DOMContentLoaded', function() {
-    lucide.createIcons();
+    // Initialize Icons
+    if(typeof lucide !== 'undefined') {
+        lucide.createIcons();
+    }
     
     // Hide loading screen after 1 second
     setTimeout(() => {
@@ -58,7 +67,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if(loader) loader.style.display = 'none';
     }, 1000);
     
-    // Hide the config notice
+    // Hide the config notice if it exists
     const notice = document.getElementById('firebase-notice');
     if(notice) notice.style.display = 'none';
 });
@@ -67,14 +76,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function showPage(pageId) {
     document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
-    document.getElementById(pageId).classList.add('active');
+    const target = document.getElementById(pageId);
+    if(target) target.classList.add('active');
 }
 
 function showToast(title, message, type = 'success') {
+    const container = document.getElementById('toast-container');
+    if (!container) return; // Guard clause
+    
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
     toast.innerHTML = `<div class="toast-title">${title}</div><div class="toast-message">${message}</div>`;
-    document.getElementById('toast-container').appendChild(toast);
+    container.appendChild(toast);
     setTimeout(() => toast.remove(), 5000);
 }
 
@@ -95,7 +108,8 @@ function getBadgeClass(status) {
     const map = {
         'pending': 'warning', 'approved': 'success', 'rejected': 'error',
         'online': 'success', 'offline': 'secondary', 'delivered': 'success',
-        'preparing': 'warning', 'ready': 'success', 'picked_up': 'warning'
+        'preparing': 'warning', 'ready': 'success', 'picked_up': 'warning',
+        'accepted': 'success'
     };
     return map[status] || 'secondary';
 }
@@ -106,7 +120,8 @@ function formatStatus(status) {
 
 // --- AUTH ACTIONS (LOGIN / REGISTER) ---
 
-function switchTab(tab) {
+// Expose functions to window so HTML buttons can see them
+window.switchTab = function(tab) {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.auth-form').forEach(f => f.classList.remove('active'));
     
@@ -119,7 +134,7 @@ function switchTab(tab) {
     }
 }
 
-async function handleLogin(event) {
+window.handleLogin = async function(event) {
     event.preventDefault();
     const email = document.getElementById('login-email').value;
     const password = document.getElementById('login-password').value;
@@ -135,7 +150,7 @@ async function handleLogin(event) {
     }
 }
 
-async function handleRegister(event) {
+window.handleRegister = async function(event) {
     event.preventDefault();
     const email = document.getElementById('register-email').value;
     const password = document.getElementById('register-password').value;
@@ -176,37 +191,41 @@ async function handleRegister(event) {
     }
 }
 
-async function logout() {
+window.logout = async function() {
     await auth.signOut();
-    location.reload(); // Refresh page to clear memory
+    localStorage.clear();
+    location.reload(); 
 }
 
 // --- DASHBOARD ROUTING ---
 
-function showDashboard(role) {
+window.showDashboard = function(role) {
     const map = {
         'admin': 'admin-dashboard',
         'restaurant': 'restaurant-dashboard',
         'customer': 'customer-dashboard',
         'driver': 'driver-dashboard'
     };
-    showPage(map[role]);
+    if(map[role]) showPage(map[role]);
     
     // Initialize specific data
-    if (role === 'admin') loadAdminData();
+    if (role === 'admin') loadRestaurantsTable();
     if (role === 'restaurant') loadRestaurantData();
     if (role === 'customer') loadCustomerData();
     if (role === 'driver') loadDriverData();
 }
 
-function switchDashboardTab(tabName) {
+window.switchDashboardTab = function(tabName) {
     // Hide all tabs
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     document.querySelectorAll('.dashboard-tabs .tab-btn').forEach(b => b.classList.remove('active'));
     
     // Show selected tab
-    document.getElementById(tabName + '-tab').classList.add('active');
-    event.target.classList.add('active');
+    const tabEl = document.getElementById(tabName + '-tab');
+    if(tabEl) tabEl.classList.add('active');
+    
+    // Highlight button (assuming event is passed or we find it)
+    if(event && event.target) event.target.classList.add('active');
     
     // Load data
     if (tabName === 'restaurants') loadRestaurantsTable();
@@ -219,8 +238,9 @@ function switchDashboardTab(tabName) {
 
 // --- ADMIN SECTION ---
 
-async function loadRestaurantsTable() {
+window.loadRestaurantsTable = async function() {
     const tbody = document.getElementById('restaurants-table');
+    if(!tbody) return;
     tbody.innerHTML = 'Loading...';
     
     const snap = await db.collection('restaurants').get();
@@ -245,14 +265,17 @@ async function loadRestaurantsTable() {
     });
 }
 
-async function adminApprove(id, status) {
+window.adminApprove = async function(id, status) {
     await db.collection('restaurants').doc(id).update({ status: status });
     loadRestaurantsTable();
 }
 
-async function loadOrdersTable() {
+window.loadOrdersTable = async function() {
     const tbody = document.getElementById('orders-table');
+    if(!tbody) return;
     tbody.innerHTML = 'Loading...';
+    
+    // NOTE: If this fails, check console for Firestore Index link
     const snap = await db.collection('orders').orderBy('createdAt', 'desc').limit(20).get();
     tbody.innerHTML = '';
     
@@ -274,16 +297,21 @@ async function loadOrdersTable() {
 
 // --- RESTAURANT SECTION ---
 
-function loadRestaurantData() {
+window.loadRestaurantData = function() {
     loadRestaurantOrders();
     // Real-time listener for new orders
-    db.collection('orders')
-      .where('restaurantId', '==', auth.currentUser.uid)
-      .onSnapshot(() => loadRestaurantOrders());
+    if (auth.currentUser) {
+        db.collection('orders')
+          .where('restaurantId', '==', auth.currentUser.uid)
+          .onSnapshot(() => loadRestaurantOrders());
+    }
 }
 
-async function loadRestaurantOrders() {
+window.loadRestaurantOrders = async function() {
     const div = document.getElementById('restaurant-orders-list');
+    if(!div) return;
+    
+    // NOTE: Firestore might require an index for this query (restaurantId + createdAt)
     const snap = await db.collection('orders')
         .where('restaurantId', '==', auth.currentUser.uid)
         .orderBy('createdAt', 'desc')
@@ -316,15 +344,18 @@ async function loadRestaurantOrders() {
     });
 }
 
-async function updateOrderStatus(id, status) {
+window.updateOrderStatus = async function(id, status) {
     await db.collection('orders').doc(id).update({ status: status });
     showToast('Updated', `Order marked as ${status}`);
+    loadRestaurantOrders();
 }
 
 // --- RESTAURANT MENU ---
 
-async function loadMenuItems() {
+window.loadMenuItems = async function() {
     const list = document.getElementById('menu-items-list');
+    if(!list) return;
+    
     const snap = await db.collection('menuItems').where('restaurantId', '==', auth.currentUser.uid).get();
     
     list.innerHTML = '';
@@ -342,10 +373,10 @@ async function loadMenuItems() {
     });
 }
 
-function showAddItemModal() { document.getElementById('add-item-modal').classList.add('active'); }
-function hideAddItemModal() { document.getElementById('add-item-modal').classList.remove('active'); }
+window.showAddItemModal = function() { document.getElementById('add-item-modal').classList.add('active'); }
+window.hideAddItemModal = function() { document.getElementById('add-item-modal').classList.remove('active'); }
 
-async function addMenuItem(e) {
+window.addMenuItem = async function(e) {
     e.preventDefault();
     const name = document.getElementById('item-name').value;
     const desc = document.getElementById('item-description').value;
@@ -364,7 +395,7 @@ async function addMenuItem(e) {
     showToast('Success', 'Item Added');
 }
 
-async function deleteMenuItem(id) {
+window.deleteMenuItem = async function(id) {
     if(confirm('Delete?')) {
         await db.collection('menuItems').doc(id).delete();
         loadMenuItems();
@@ -373,13 +404,14 @@ async function deleteMenuItem(id) {
 
 // --- CUSTOMER SECTION ---
 
-function loadCustomerData() {
+window.loadCustomerData = function() {
     loadRestaurantsList();
     loadCustomerOrders();
 }
 
-async function loadRestaurantsList() {
+window.loadRestaurantsList = async function() {
     const grid = document.getElementById('restaurants-grid');
+    if(!grid) return;
     grid.innerHTML = 'Loading...';
     
     const snap = await db.collection('restaurants').where('status', '==', 'approved').get();
@@ -402,12 +434,20 @@ async function loadRestaurantsList() {
     });
 }
 
-async function openRestaurantMenu(id, restaurant) {
+window.openRestaurantMenu = async function(id, restaurant) {
     selectedRestaurant = { id: id, ...restaurant };
+    
+    // Save to local storage in case of refresh
+    localStorage.setItem('selectedRestaurant', JSON.stringify(selectedRestaurant));
+
     document.getElementById('restaurants-view').style.display = 'none';
     document.getElementById('restaurant-menu-view').style.display = 'block';
-    document.getElementById('selected-restaurant-name').textContent = restaurant.name;
-    document.getElementById('cart-restaurant-name').textContent = restaurant.name;
+    
+    const nameEl = document.getElementById('selected-restaurant-name');
+    if(nameEl) nameEl.textContent = restaurant.name;
+    
+    const cartNameEl = document.getElementById('cart-restaurant-name');
+    if(cartNameEl) cartNameEl.textContent = restaurant.name;
     
     // Load Menu
     const grid = document.getElementById('menu-items-grid');
@@ -429,7 +469,7 @@ async function openRestaurantMenu(id, restaurant) {
     });
 }
 
-function backToRestaurants() {
+window.backToRestaurants = function() {
     document.getElementById('restaurants-view').style.display = 'block';
     document.getElementById('restaurant-menu-view').style.display = 'none';
     cart = {};
@@ -438,15 +478,14 @@ function backToRestaurants() {
 
 // --- CART LOGIC ---
 
-function addToCart(id, name, price) {
+window.addToCart = function(id, name, price) {
     if (!cart[id]) cart[id] = { name, price, qty: 0 };
     cart[id].qty++;
     updateCartDisplay();
 }
 
-function updateCartDisplay() {
+window.updateCartDisplay = function() {
     const container = document.getElementById('cart-items');
-    const totalEl = document.getElementById('final-total');
     let total = 0;
     let html = '';
     let count = 0;
@@ -461,13 +500,22 @@ function updateCartDisplay() {
         </div>`;
     });
     
+    // Safety check: ensure selectedRestaurant exists
     const fee = selectedRestaurant ? selectedRestaurant.deliveryFee : 0;
     
-    container.innerHTML = html || '<p>Empty Cart</p>';
-    document.getElementById('subtotal').textContent = `$${total.toFixed(2)}`;
-    document.getElementById('delivery-fee').textContent = `$${fee.toFixed(2)}`;
-    document.getElementById('final-total').textContent = `$${(total + fee).toFixed(2)}`;
-    document.getElementById('cart-count').textContent = count;
+    if(container) container.innerHTML = html || '<p>Empty Cart</p>';
+    
+    const sub = document.getElementById('subtotal');
+    if(sub) sub.textContent = `$${total.toFixed(2)}`;
+    
+    const del = document.getElementById('delivery-fee');
+    if(del) del.textContent = `$${fee.toFixed(2)}`;
+    
+    const final = document.getElementById('final-total');
+    if(final) final.textContent = `$${(total + fee).toFixed(2)}`;
+    
+    const countEl = document.getElementById('cart-count');
+    if(countEl) countEl.textContent = count;
     
     if(count > 0) {
         document.getElementById('cart-button').style.display = 'flex';
@@ -475,10 +523,12 @@ function updateCartDisplay() {
     }
 }
 
-async function placeOrder() {
+window.placeOrder = async function() {
     if (Object.keys(cart).length === 0) return;
     
-    const total = parseFloat(document.getElementById('final-total').textContent.replace('$', ''));
+    const finalTotalEl = document.getElementById('final-total');
+    const total = parseFloat(finalTotalEl.textContent.replace('$', ''));
+    
     const itemsList = [];
     Object.values(cart).forEach(i => itemsList.push({ name: i.name, qty: i.qty }));
     
@@ -500,9 +550,15 @@ async function placeOrder() {
     showToast('Success', 'Order Placed');
 }
 
-async function loadCustomerOrders() {
+window.loadCustomerOrders = async function() {
     const div = document.getElementById('customer-orders-list');
-    const snap = await db.collection('orders').where('customerId', '==', auth.currentUser.uid).orderBy('createdAt', 'desc').get();
+    if(!div) return;
+    
+    // NOTE: If console error, create Index for customerId + createdAt
+    const snap = await db.collection('orders')
+        .where('customerId', '==', auth.currentUser.uid)
+        .orderBy('createdAt', 'desc')
+        .get();
     
     div.innerHTML = '';
     snap.forEach(doc => {
@@ -520,23 +576,29 @@ async function loadCustomerOrders() {
 
 // --- DRIVER SECTION ---
 
-function loadDriverData() {
+window.loadDriverData = function() {
     const toggle = document.getElementById('driver-online-status');
     if (toggle) toggle.checked = isDriverOnline;
-    document.getElementById('driver-status-text').textContent = isDriverOnline ? "Online" : "Offline";
-    document.getElementById('offline-notice').style.display = isDriverOnline ? 'none' : 'block';
+    
+    const statusText = document.getElementById('driver-status-text');
+    if(statusText) statusText.textContent = isDriverOnline ? "Online" : "Offline";
+    
+    const notice = document.getElementById('offline-notice');
+    if(notice) notice.style.display = isDriverOnline ? 'none' : 'block';
     
     if (isDriverOnline) loadAvailableDriverOrders();
     loadMyDeliveries();
 }
 
-function toggleDriverStatus() {
+window.toggleDriverStatus = function() {
     isDriverOnline = !isDriverOnline;
     loadDriverData();
 }
 
-async function loadAvailableDriverOrders() {
+window.loadAvailableDriverOrders = async function() {
     const div = document.getElementById('available-orders-list');
+    if(!div) return;
+    
     if (!isDriverOnline) {
         div.innerHTML = '<p>You are offline.</p>';
         return;
@@ -571,7 +633,7 @@ async function loadAvailableDriverOrders() {
     if (!found) div.innerHTML = '<p>No orders ready for pickup.</p>';
 }
 
-async function driverAccept(id) {
+window.driverAccept = async function(id) {
     await db.collection('orders').doc(id).update({
         driverId: auth.currentUser.uid,
         driverEmail: auth.currentUser.email,
@@ -581,8 +643,10 @@ async function driverAccept(id) {
     showToast('Success', 'Order Accepted');
 }
 
-async function loadMyDeliveries() {
+window.loadMyDeliveries = async function() {
     const div = document.getElementById('my-orders-list');
+    if(!div) return;
+    
     const snap = await db.collection('orders')
         .where('driverId', '==', auth.currentUser.uid)
         .where('status', 'in', ['picked_up', 'on_way'])
@@ -607,7 +671,7 @@ async function loadMyDeliveries() {
     });
 }
 
-async function driverUpdate(id, status) {
+window.driverUpdate = async function(id, status) {
     await db.collection('orders').doc(id).update({ status: status });
     loadDriverData();
 }
