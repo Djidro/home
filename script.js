@@ -30,26 +30,31 @@ let isDriverOnline = false;
 
 auth.onAuthStateChanged(async (user) => {
     if (user) {
+        // --- NEW CODE: CHECK IF EMAIL IS VERIFIED ---
+        if (!user.emailVerified) {
+            showToast('Verify Email', 'Please verify your email to continue.', 'error');
+            await auth.signOut();
+            showPage('auth-page');
+            return;
+        }
+
         currentUser = user;
-        // Check the database to find out if this user is a Driver, Admin, or Customer
+        // ... (the rest of your existing code inside this block) ...
         const userDoc = await db.collection('users').doc(user.uid).get();
         if (userDoc.exists) {
             currentUserRole = userDoc.data().role;
             localStorage.setItem('userRole', currentUserRole);
             localStorage.setItem('userEmail', user.email);
             
-            // Restore restaurant selection if refreshing page
             const savedRest = localStorage.getItem('selectedRestaurant');
             if (savedRest) selectedRestaurant = JSON.parse(savedRest);
 
-            // If we are still on the login screen, move to dashboard
             const authPage = document.getElementById('auth-page');
             if (authPage && authPage.classList.contains('active')) {
                 showDashboard(currentUserRole);
             }
         }
     } else {
-        // User is logged out
         showPage('auth-page');
     }
 });
@@ -141,7 +146,16 @@ window.handleLogin = async function(event) {
     
     setLoading('login-btn', true);
     try {
-        await auth.signInWithEmailAndPassword(email, password);
+        const userCredential = await auth.signInWithEmailAndPassword(email, password);
+        
+        // Check verification immediately during login
+        if (!userCredential.user.emailVerified) {
+            showToast('Verify Email', 'Check your inbox for the link we sent earlier!', 'warning');
+            await auth.signOut();
+            setLoading('login-btn', false);
+            return;
+        }
+
         showToast('Success', 'Login successful');
     } catch (error) {
         showToast('Error', error.message, 'error');
@@ -149,7 +163,6 @@ window.handleLogin = async function(event) {
         setLoading('login-btn', false);
     }
 }
-
 window.handleRegister = async function(event) {
     event.preventDefault();
     const email = document.getElementById('register-email').value;
@@ -164,6 +177,10 @@ window.handleRegister = async function(event) {
     try {
         const cred = await auth.createUserWithEmailAndPassword(email, password);
         
+        // --- NEW CODE: SEND VERIFICATION EMAIL ---
+        await cred.user.sendEmailVerification();
+        showToast('Check Email', 'A verification link has been sent to ' + email);
+
         // Save the Role
         await db.collection('users').doc(cred.user.uid).set({
             email: email,
@@ -171,7 +188,6 @@ window.handleRegister = async function(event) {
             createdAt: new Date()
         });
 
-        // If Restaurant, create profile
         if (role === 'restaurant') {
             await db.collection('restaurants').doc(cred.user.uid).set({
                 name: email.split('@')[0] + "'s Kitchen",
@@ -183,7 +199,11 @@ window.handleRegister = async function(event) {
             });
         }
         
-        showToast('Success', 'Account created!');
+        // --- NEW CODE: LOGOUT IMMEDIATELY ---
+        // They must verify their email before they can actually log in
+        await auth.signOut();
+        switchTab('login');
+        
     } catch (error) {
         showToast('Error', error.message, 'error');
     } finally {
