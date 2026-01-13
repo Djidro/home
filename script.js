@@ -31,12 +31,12 @@ let isDriverOnline = false;
 auth.onAuthStateChanged(async (user) => {
     if (user) {
         // --- NEW CODE: CHECK IF EMAIL IS VERIFIED ---
-        if (!user.emailVerified) {
-            showToast('Verify Email', 'Please verify your email to continue.', 'error');
-            await auth.signOut();
-            showPage('auth-page');
-            return;
-        }
+    //    if (!user.emailVerified) {
+      //    showToast('Verify Email', 'Please verify your email to continue.', 'error');
+        //    await auth.signOut();
+       //  showPage('auth-page');
+      //   return;
+      //    }
 
         currentUser = user;
         // ... (the rest of your existing code inside this block) ...
